@@ -4,6 +4,27 @@ import { calcEngagementScore } from "./lib/score.js";
 
 const QUERY = "lang:ja filter:videos min_faves:5000 -filter:replies";
 
+function extractMedia(raw) {
+  const items = raw.extendedEntities?.media ?? [];
+  const video = items.find((m) => m.type === "video" || m.type === "animated_gif");
+  if (!video) return { type: "video" };
+
+  const variants = video.video_info?.variants ?? [];
+  const mp4s = variants
+    .filter((v) => v.content_type === "video/mp4" && typeof v.bitrate === "number")
+    .sort((a, b) => b.bitrate - a.bitrate);
+
+  return {
+    type: video.type,
+    thumbnailUrl: video.media_url_https ?? null,
+    videoUrl: mp4s[0]?.url ?? null,
+    durationMs: video.video_info?.duration_millis ?? null,
+    aspectRatio: video.video_info?.aspect_ratio ?? null,
+    width: video.original_info?.width ?? null,
+    height: video.original_info?.height ?? null,
+  };
+}
+
 function normalizeTweet(raw) {
   const metrics = {
     viewCount: raw.viewCount ?? 0,
@@ -27,8 +48,9 @@ function normalizeTweet(raw) {
       name: raw.author?.name,
       isBlueVerified: raw.author?.isBlueVerified,
       followersCount: raw.author?.followers ?? 0,
+      profileImageUrl: raw.author?.profilePicture ?? null,
     },
-    media: { type: "video" },
+    media: extractMedia(raw),
   };
 }
 
