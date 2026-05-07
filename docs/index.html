@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Trend Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            xblue: '#1d9bf0',
+            xdark: '#15202b',
+            xdarker: '#0d1520',
+          }
+        }
+      }
+    };
+    // Apply dark mode based on system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      document.documentElement.classList.toggle('dark', e.matches);
+    });
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .tweet-card { transition: background-color 0.15s ease; }
+    .tweet-card:hover { background-color: rgba(29, 155, 240, 0.08); }
+    .tab-active { background-color: #1d9bf0; color: #fff; }
+    .spinner { border: 3px solid rgba(29,155,240,0.2); border-top-color: #1d9bf0; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-white dark:bg-xdark text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="border-b border-gray-200 dark:border-gray-700 px-4 py-6 sm:px-6">
+    <div class="max-w-3xl mx-auto">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
+        <span class="text-xblue">X</span> Trend Monitor
+      </h1>
+      <p id="last-updated" class="text-sm text-gray-500 dark:text-gray-400 mt-1">読み込み中...</p>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-3">
+    <div class="max-w-3xl mx-auto space-y-3">
+      <!-- Period tabs -->
+      <div id="period-tabs" class="flex gap-2">
+        <button data-period="daily" class="tab-active px-4 py-2 rounded-full text-sm font-medium border border-xblue transition-colors">
+          直近1日
+        </button>
+        <button data-period="weekly" class="px-4 py-2 rounded-full text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-xblue hover:text-xblue transition-colors">
+          直近7日
+        </button>
+        <button data-period="monthly" class="px-4 py-2 rounded-full text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-xblue hover:text-xblue transition-colors">
+          直近30日
+        </button>
+      </div>
+
+      <!-- Sort selector -->
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500 dark:text-gray-400">Sort:</span>
+        <select id="sort-select" class="bg-gray-100 dark:bg-xdarker border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xblue">
+          <option value="by_views">再生数</option>
+          <option value="by_bookmarks">保存数</option>
+          <option value="by_engagement">総合スコア</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats line -->
+  <div class="px-4 sm:px-6 py-2">
+    <div class="max-w-3xl mx-auto">
+      <p id="stats-line" class="text-xs text-gray-400 dark:text-gray-500"></p>
+    </div>
+  </div>
+
+  <!-- Tweet list -->
+  <main class="flex-1 px-4 sm:px-6 pb-8">
+    <div id="tweet-list" class="max-w-3xl mx-auto space-y-2">
+      <!-- Loading state -->
+      <div id="loading-state" class="flex flex-col items-center justify-center py-20">
+        <div class="spinner"></div>
+        <p class="mt-4 text-sm text-gray-400">データを読み込み中...</p>
+      </div>
+      <!-- Error state (hidden by default) -->
+      <div id="error-state" class="hidden flex flex-col items-center justify-center py-20">
+        <p class="text-red-500 text-lg">&#x26A0; データの読み込みに失敗しました</p>
+        <p id="error-message" class="text-sm text-gray-400 mt-2"></p>
+        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-xblue text-white rounded-full text-sm hover:opacity-90 transition-opacity">再読み込み</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 dark:border-gray-700 px-4 py-4 text-center">
+    <p class="text-xs text-gray-400 dark:text-gray-500">Powered by NT Studio</p>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

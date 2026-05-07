@@ -1,0 +1,16 @@
+{
+  "name": "x-trend-monitor",
+  "version": "1.0.0",
+  "description": "日本語×動画ツイートのトレンドを自動収集し、ランキングをWebダッシュボードで閲覧",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "fetch": "node src/index.js"
+  },
+  "author": "NT Studio",
+  "license": "MIT",
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0"
+  }
+}
