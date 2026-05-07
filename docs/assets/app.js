@@ -224,59 +224,43 @@
 
   function openVideoModal(videoUrl, posterUrl, tweetUrl) {
     modalContentEl.innerHTML = "";
-    var video = document.createElement("video");
-    video.controls = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    if (posterUrl) video.poster = posterUrl;
-    video.className = "max-w-full max-h-[90vh] rounded-lg shadow-2xl bg-black";
 
-    // Use a <source> child so we can detect failure (video.error doesn't always fire on src= failure)
-    var source = document.createElement("source");
-    source.src = videoUrl;
-    source.type = "video/mp4";
-    video.appendChild(source);
-
-    // Fallback link visible if video fails entirely
-    var fallback = document.createElement("div");
-    fallback.className = "mt-3 text-center text-sm text-white/70";
-    fallback.innerHTML = '再生できない場合は <a href="' + tweetUrl + '" target="_blank" rel="noopener noreferrer" class="text-xblue underline">X で開く</a>';
-
-    var failed = false;
-    var fallbackToX = function () {
-      if (failed) return;
-      failed = true;
-      closeModal();
-      if (tweetUrl) window.open(tweetUrl, "_blank", "noopener");
-    };
-
-    // Only fallback on hard error after a delay
-    source.addEventListener("error", function () {
-      setTimeout(fallbackToX, 500);
-    });
-
-    // Try to play; if autoplay blocked, retry muted
-    var tryPlay = function () {
-      var p = video.play();
-      if (p && p.catch) {
-        p.catch(function () {
-          video.muted = true;
-          var p2 = video.play();
-          if (p2 && p2.catch) p2.catch(function () { /* user controls */ });
-        });
-      }
-    };
-
-    video.addEventListener("loadedmetadata", tryPlay);
-
+    // Container that holds the X embed
     var wrapper = document.createElement("div");
-    wrapper.className = "flex flex-col items-center w-full";
-    wrapper.appendChild(video);
-    wrapper.appendChild(fallback);
+    wrapper.className = "w-full max-w-xl mx-auto bg-white rounded-lg overflow-hidden";
+    wrapper.style.maxHeight = "90vh";
+    wrapper.style.overflowY = "auto";
+
+    // Loading hint shown until widgets.js renders the embed
+    var loading = document.createElement("div");
+    loading.className = "p-8 text-center text-gray-500 text-sm";
+    loading.textContent = "ツイートを読み込み中...";
+    wrapper.appendChild(loading);
+
+    // X embed blockquote
+    var bq = document.createElement("blockquote");
+    bq.className = "twitter-tweet";
+    bq.setAttribute("data-dnt", "true");
+    bq.setAttribute("data-theme", "light");
+    bq.innerHTML = '<a href="' + tweetUrl + '"></a>';
+    wrapper.appendChild(bq);
 
     modalContentEl.appendChild(wrapper);
     modalEl.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+
+    // Trigger widget rendering
+    var renderEmbed = function () {
+      if (window.twttr && window.twttr.widgets && window.twttr.widgets.load) {
+        window.twttr.widgets.load(wrapper).then(function () {
+          if (loading.parentNode) loading.parentNode.removeChild(loading);
+        });
+      } else {
+        // widgets.js still loading — retry
+        setTimeout(renderEmbed, 200);
+      }
+    };
+    renderEmbed();
   }
 
   function closeModal() {
