@@ -73,19 +73,41 @@
 
   // --- Rendering ---
 
-  function getRankings() {
-    if (!data || !data.rankings) return [];
-    var periodData = data.rankings[currentPeriod];
-    if (!periodData) return [];
-    var sorted = periodData[currentSort];
-    if (!sorted) {
-      var keys = Object.keys(periodData);
-      for (var i = 0; i < keys.length; i++) {
-        if (Array.isArray(periodData[keys[i]])) sorted = periodData[keys[i]];
-      }
-      if (!sorted) return [];
+  // Default cap when no filter is active. With filter active, show all matches.
+  var DEFAULT_TOP_N = 50;
+
+  function getAllTweetsForPeriod() {
+    if (!data) return [];
+    // New schema: data.tweets[period]
+    if (data.tweets && Array.isArray(data.tweets[currentPeriod])) {
+      return data.tweets[currentPeriod];
     }
-    return applyFilter(sorted);
+    // Legacy schema fallback: data.rankings[period][by_*]
+    if (data.rankings && data.rankings[currentPeriod]) {
+      var pd = data.rankings[currentPeriod];
+      var keys = Object.keys(pd);
+      for (var i = 0; i < keys.length; i++) {
+        if (Array.isArray(pd[keys[i]])) return pd[keys[i]];
+      }
+    }
+    return [];
+  }
+
+  function sortKey(tweet) {
+    if (currentSort === "by_bookmarks") return (tweet.metrics && tweet.metrics.bookmarkCount) || 0;
+    if (currentSort === "by_engagement") return tweet.engagementScore || 0;
+    return (tweet.metrics && tweet.metrics.viewCount) || 0;
+  }
+
+  function getRankings() {
+    var all = getAllTweetsForPeriod();
+    var filtered = applyFilter(all);
+    var sorted = filtered.slice().sort(function (a, b) {
+      return sortKey(b) - sortKey(a);
+    });
+    // No cap when filter is active — user wants to see all matches
+    if (currentFilter.trim()) return sorted;
+    return sorted.slice(0, DEFAULT_TOP_N);
   }
 
   function applyFilter(tweets) {
@@ -200,10 +222,15 @@
     var rankings = getRankings();
 
     var periodLabel = periodLabels[currentPeriod] || currentPeriod;
-    var filterNote = currentFilter.trim()
-      ? " | 絞り込み: \"" + currentFilter.trim() + "\""
-      : "";
-    statsLineEl.textContent = periodLabel + " - " + rankings.length + "件のツイート" + filterNote;
+    var totalForPeriod = getAllTweetsForPeriod().length;
+    var statsText;
+    if (currentFilter.trim()) {
+      statsText = periodLabel + " - " + rankings.length + " / " + totalForPeriod + "件 マッチ（\"" + currentFilter.trim() + "\"）";
+    } else {
+      var shown = Math.min(DEFAULT_TOP_N, totalForPeriod);
+      statsText = periodLabel + " - 上位 " + shown + "件 / 全 " + totalForPeriod + "件";
+    }
+    statsLineEl.textContent = statsText;
 
     tweetListEl.innerHTML = "";
 

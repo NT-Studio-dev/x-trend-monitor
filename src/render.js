@@ -3,7 +3,10 @@ import path from "node:path";
 
 const DATA_DIR = path.resolve("data");
 const DOCS_DIR = path.resolve("docs");
-const TOP_N = 50;
+
+// Cap monthly to keep data.json size bounded.
+// Daily/weekly are not capped — they are naturally bounded by min_faves filter.
+const MONTHLY_CAP = 500;
 
 function findLatestFile(dir) {
   if (!fs.existsSync(dir)) return null;
@@ -25,27 +28,11 @@ function labelFromFilename(filePath) {
   return path.basename(filePath, ".json");
 }
 
-function buildRankings(tweets) {
-  if (!tweets || tweets.length === 0) {
-    return { by_views: [], by_bookmarks: [], by_engagement: [] };
-  }
-
-  const byViews = [...tweets]
-    .sort((a, b) => (b.metrics?.viewCount ?? 0) - (a.metrics?.viewCount ?? 0))
-    .slice(0, TOP_N);
-
-  const byBookmarks = [...tweets]
-    .sort(
-      (a, b) =>
-        (b.metrics?.bookmarkCount ?? 0) - (a.metrics?.bookmarkCount ?? 0),
-    )
-    .slice(0, TOP_N);
-
-  const byEngagement = [...tweets]
+function capByEngagement(tweets, cap) {
+  if (!tweets || tweets.length <= cap) return tweets ?? [];
+  return [...tweets]
     .sort((a, b) => (b.engagementScore ?? 0) - (a.engagementScore ?? 0))
-    .slice(0, TOP_N);
-
-  return { by_views: byViews, by_bookmarks: byBookmarks, by_engagement: byEngagement };
+    .slice(0, cap);
 }
 
 export function render() {
@@ -59,7 +46,7 @@ export function render() {
 
   const dailyTweets = daily?.tweets ?? [];
   const weeklyTweets = weekly?.tweets ?? [];
-  const monthlyTweets = monthly?.tweets ?? [];
+  const monthlyTweets = capByEngagement(monthly?.tweets ?? [], MONTHLY_CAP);
 
   const output = {
     generated_at: new Date().toISOString(),
@@ -77,17 +64,19 @@ export function render() {
         tweet_count: monthlyTweets.length,
       },
     },
-    rankings: {
-      daily: buildRankings(dailyTweets),
-      weekly: buildRankings(weeklyTweets),
-      monthly: buildRankings(monthlyTweets),
+    tweets: {
+      daily: dailyTweets,
+      weekly: weeklyTweets,
+      monthly: monthlyTweets,
     },
   };
 
   fs.mkdirSync(DOCS_DIR, { recursive: true });
   const outPath = path.join(DOCS_DIR, "data.json");
-  fs.writeFileSync(outPath, JSON.stringify(output, null, 2));
+  fs.writeFileSync(outPath, JSON.stringify(output));
 
-  console.log(`[render] Wrote ${outPath}`);
+  console.log(
+    `[render] Wrote ${outPath} (daily=${dailyTweets.length}, weekly=${weeklyTweets.length}, monthly=${monthlyTweets.length})`,
+  );
   return output;
 }
