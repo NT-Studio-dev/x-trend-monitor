@@ -69,14 +69,25 @@
         </button>
       </div>
 
-      <!-- Sort selector -->
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-500 dark:text-gray-400">Sort:</span>
-        <select id="sort-select" class="bg-gray-100 dark:bg-xdarker border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xblue">
-          <option value="by_views">再生数</option>
-          <option value="by_bookmarks">保存数</option>
-          <option value="by_engagement">総合スコア</option>
-        </select>
+      <!-- Sort + filter row -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500 dark:text-gray-400">Sort:</span>
+          <select id="sort-select" class="bg-gray-100 dark:bg-xdarker border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xblue">
+            <option value="by_views">再生数</option>
+            <option value="by_bookmarks">保存数</option>
+            <option value="by_engagement">総合スコア</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 flex-1 min-w-[180px]">
+          <input
+            id="filter-input"
+            type="search"
+            placeholder="キーワードで絞り込み（スペース区切りでAND検索）"
+            class="flex-1 bg-gray-100 dark:bg-xdarker border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xblue placeholder:text-gray-400"
+          />
+          <button id="filter-clear" type="button" class="hidden text-xs text-gray-500 hover:text-xblue">クリア</button>
+        </div>
       </div>
     </div>
   </div>

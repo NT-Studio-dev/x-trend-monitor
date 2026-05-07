@@ -5,11 +5,14 @@
   var data = null;
   var currentPeriod = "daily";
   var currentSort = "by_views";
+  var currentFilter = "";
 
   // --- DOM refs ---
   var lastUpdatedEl = document.getElementById("last-updated");
   var periodTabsEl = document.getElementById("period-tabs");
   var sortSelectEl = document.getElementById("sort-select");
+  var filterInputEl = document.getElementById("filter-input");
+  var filterClearEl = document.getElementById("filter-clear");
   var tweetListEl = document.getElementById("tweet-list");
   var loadingStateEl = document.getElementById("loading-state");
   var errorStateEl = document.getElementById("error-state");
@@ -76,14 +79,31 @@
     if (!periodData) return [];
     var sorted = periodData[currentSort];
     if (!sorted) {
-      // Fallback: try first available sort key
       var keys = Object.keys(periodData);
       for (var i = 0; i < keys.length; i++) {
-        if (Array.isArray(periodData[keys[i]])) return periodData[keys[i]];
+        if (Array.isArray(periodData[keys[i]])) sorted = periodData[keys[i]];
       }
-      return [];
+      if (!sorted) return [];
     }
-    return sorted;
+    return applyFilter(sorted);
+  }
+
+  function applyFilter(tweets) {
+    var q = currentFilter.trim().toLowerCase();
+    if (!q) return tweets;
+    var terms = q.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return tweets;
+    return tweets.filter(function (t) {
+      var hay = (
+        (t.text || "") + " " +
+        ((t.author && t.author.userName) || "") + " " +
+        ((t.author && t.author.name) || "")
+      ).toLowerCase();
+      for (var i = 0; i < terms.length; i++) {
+        if (hay.indexOf(terms[i]) === -1) return false;
+      }
+      return true;
+    });
   }
 
   function formatDuration(ms) {
@@ -180,14 +200,19 @@
     var rankings = getRankings();
 
     var periodLabel = periodLabels[currentPeriod] || currentPeriod;
-    statsLineEl.textContent = periodLabel + " - " + rankings.length + "件のツイート";
+    var filterNote = currentFilter.trim()
+      ? " | 絞り込み: \"" + currentFilter.trim() + "\""
+      : "";
+    statsLineEl.textContent = periodLabel + " - " + rankings.length + "件のツイート" + filterNote;
 
     tweetListEl.innerHTML = "";
 
     if (rankings.length === 0) {
       var empty = document.createElement("div");
       empty.className = "col-span-full text-center py-16 text-gray-400 dark:text-gray-500";
-      empty.textContent = "該当するデータがありません";
+      empty.textContent = currentFilter.trim()
+        ? "キーワードに一致するツイートがありません"
+        : "該当するデータがありません";
       tweetListEl.appendChild(empty);
       return;
     }
@@ -301,6 +326,27 @@
   sortSelectEl.addEventListener("change", function () {
     currentSort = sortSelectEl.value;
     render();
+  });
+
+  // Filter input (debounced)
+  var filterTimer = null;
+  function onFilterChange() {
+    currentFilter = filterInputEl.value;
+    if (currentFilter.trim()) {
+      filterClearEl.classList.remove("hidden");
+    } else {
+      filterClearEl.classList.add("hidden");
+    }
+    render();
+  }
+  filterInputEl.addEventListener("input", function () {
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(onFilterChange, 120);
+  });
+  filterClearEl.addEventListener("click", function () {
+    filterInputEl.value = "";
+    onFilterChange();
+    filterInputEl.focus();
   });
 
   // --- Show/hide states ---
