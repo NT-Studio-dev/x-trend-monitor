@@ -1,0 +1,15 @@
+{
+  "date": "2026-05-08",
+  "timezone": "Asia/Tokyo",
+  "fetched_at": "2026-05-08T19:30:01.831Z",
+  "query": {
+    "text": "lang:ja filter:videos min_faves:5000 -filter:replies",
+    "type": "Latest"
+  },
+  "stats": {
+    "total_fetched": 0,
+    "unique_tweets": 0,
+    "api_calls": 0
+  },
+  "tweets": []
+}
