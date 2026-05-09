@@ -1,6 +1,13 @@
 (function () {
   "use strict";
 
+  // --- Constants ---
+  var REPO_OWNER = "NT-Studio-dev";
+  var REPO_NAME = "x-trend-monitor";
+  var WORKFLOW_FILENAME = "daily.yml";
+  var FAV_KEY = "xtm_favorites_v1";
+  var PAT_KEY = "xtm_github_pat_v1";
+
   // --- State ---
   var data = null;
   var currentPeriod = "daily";
@@ -18,6 +25,61 @@
   var errorStateEl = document.getElementById("error-state");
   var errorMessageEl = document.getElementById("error-message");
   var statsLineEl = document.getElementById("stats-line");
+  var favCountEl = document.getElementById("fav-count");
+  var refreshBtnEl = document.getElementById("refresh-btn");
+  var settingsBtnEl = document.getElementById("settings-btn");
+  var settingsModalEl = document.getElementById("settings-modal");
+  var settingsCloseEl = document.getElementById("settings-close");
+  var patInputEl = document.getElementById("pat-input");
+  var patSaveEl = document.getElementById("pat-save");
+  var patClearEl = document.getElementById("pat-clear");
+  var patStatusEl = document.getElementById("pat-status");
+  var favExportEl = document.getElementById("fav-export");
+  var favClearAllEl = document.getElementById("fav-clear");
+  var refreshToastEl = document.getElementById("refresh-toast");
+  var refreshSpinnerEl = document.getElementById("refresh-spinner");
+  var refreshMessageEl = document.getElementById("refresh-message");
+  var refreshDetailEl = document.getElementById("refresh-detail");
+  var refreshToastCloseEl = document.getElementById("refresh-toast-close");
+
+  // --- Favorites module ---
+  function loadFavorites() {
+    try {
+      var raw = localStorage.getItem(FAV_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function saveFavorites(favs) {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(favs)); } catch (e) {}
+  }
+  function isFavorite(id) {
+    var favs = loadFavorites();
+    return Object.prototype.hasOwnProperty.call(favs, id);
+  }
+  function toggleFavorite(tweet) {
+    var favs = loadFavorites();
+    if (favs[tweet.id]) {
+      delete favs[tweet.id];
+    } else {
+      favs[tweet.id] = Object.assign({}, tweet, { _favoritedAt: new Date().toISOString() });
+    }
+    saveFavorites(favs);
+    updateFavCount();
+    return !!favs[tweet.id];
+  }
+  function getFavoritesArray() {
+    var favs = loadFavorites();
+    return Object.keys(favs).map(function (k) { return favs[k]; });
+  }
+  function updateFavCount() {
+    var n = Object.keys(loadFavorites()).length;
+    if (n > 0) {
+      favCountEl.textContent = n;
+      favCountEl.classList.remove("hidden");
+    } else {
+      favCountEl.classList.add("hidden");
+    }
+  }
 
   // --- Helpers ---
 
@@ -69,6 +131,7 @@
     daily: "直近1日",
     weekly: "直近7日",
     monthly: "直近30日",
+    favorites: "お気に入り",
   };
 
   // --- Rendering ---
@@ -77,12 +140,13 @@
   var DEFAULT_TOP_N = 50;
 
   function getAllTweetsForPeriod() {
+    if (currentPeriod === "favorites") {
+      return getFavoritesArray();
+    }
     if (!data) return [];
-    // New schema: data.tweets[period]
     if (data.tweets && Array.isArray(data.tweets[currentPeriod])) {
       return data.tweets[currentPeriod];
     }
-    // Legacy schema fallback: data.rankings[period][by_*]
     if (data.rankings && data.rankings[currentPeriod]) {
       var pd = data.rankings[currentPeriod];
       var keys = Object.keys(pd);
@@ -105,8 +169,8 @@
     var sorted = filtered.slice().sort(function (a, b) {
       return sortKey(b) - sortKey(a);
     });
-    // No cap when filter is active — user wants to see all matches
-    if (currentFilter.trim()) return sorted;
+    // No cap when filter is active or favorites tab — show all
+    if (currentFilter.trim() || currentPeriod === "favorites") return sorted;
     return sorted.slice(0, DEFAULT_TOP_N);
   }
 
@@ -182,6 +246,14 @@
         rank +
       "</div>";
 
+    var favOn = isFavorite(tweet.id);
+    var favBtn =
+      '<button type="button" class="fav-btn absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-sm flex items-center justify-center transition-colors" data-tweet-id="' + escapeHtml(tweet.id) + '" aria-label="お気に入り" aria-pressed="' + favOn + '">' +
+        '<svg class="w-4 h-4 ' + (favOn ? "text-yellow-400 fill-current" : "text-white") + '" viewBox="0 0 24 24" fill="' + (favOn ? "currentColor" : "none") + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round">' +
+          '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' +
+        "</svg>" +
+      "</button>";
+
     var thumbAttrs = videoUrl
       ? ' data-video="' + videoUrl + '" data-poster="' + thumbUrl + '" data-tweet-url="' + escapeHtml(tweetUrl) + '"'
       : ' data-tweet-url="' + escapeHtml(tweetUrl) + '"';
@@ -189,12 +261,13 @@
     return (
       '<div class="tweet-card group flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-xdarker hover:border-xblue transition-colors">' +
         // Thumbnail (clickable: video → modal, else → X)
-        '<button type="button" class="thumb-btn relative block w-full bg-black aspect-video overflow-hidden"' + thumbAttrs + '>' +
+        '<div class="thumb-btn relative w-full bg-black aspect-video overflow-hidden cursor-pointer" role="button" tabindex="0"' + thumbAttrs + '>' +
           thumbHtml +
           playBtnHtml +
           rankBadge +
+          favBtn +
           durBadge +
-        "</button>" +
+        "</div>" +
         // Body
         '<div class="flex-1 flex flex-col p-2.5 gap-1.5 min-w-0">' +
           // Author + primary metric
@@ -329,8 +402,47 @@
     if (e.key === "Escape" && !modalEl.classList.contains("hidden")) closeModal();
   });
 
-  // Thumbnail click: video → modal, no video → open X
+  // Click delegation: favorite toggle wins over thumbnail (it's nested inside)
   tweetListEl.addEventListener("click", function (e) {
+    var favBtn = e.target.closest(".fav-btn");
+    if (favBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var id = favBtn.getAttribute("data-tweet-id");
+      var allTweets = getAllTweetsForPeriod();
+      var tweet = null;
+      for (var i = 0; i < allTweets.length; i++) {
+        if (String(allTweets[i].id) === String(id)) { tweet = allTweets[i]; break; }
+      }
+      // If we couldn't find it (e.g., on favorites tab after deletion) skip
+      if (!tweet) {
+        var favs = loadFavorites();
+        tweet = favs[id];
+      }
+      if (!tweet) return;
+      var nowOn = toggleFavorite(tweet);
+      // Re-render to update icon (and remove from favorites tab if needed)
+      if (currentPeriod === "favorites" && !nowOn) {
+        render();
+      } else {
+        // Just toggle the icon visually without full re-render
+        var svg = favBtn.querySelector("svg");
+        if (svg) {
+          if (nowOn) {
+            svg.setAttribute("fill", "currentColor");
+            svg.classList.remove("text-white");
+            svg.classList.add("text-yellow-400", "fill-current");
+          } else {
+            svg.setAttribute("fill", "none");
+            svg.classList.remove("text-yellow-400", "fill-current");
+            svg.classList.add("text-white");
+          }
+        }
+        favBtn.setAttribute("aria-pressed", nowOn);
+      }
+      return;
+    }
+
     var btn = e.target.closest(".thumb-btn");
     if (!btn) return;
     e.preventDefault();
@@ -376,6 +488,205 @@
     filterInputEl.focus();
   });
 
+  // --- Settings modal & PAT ---
+  function getPat() {
+    try { return localStorage.getItem(PAT_KEY) || ""; } catch (e) { return ""; }
+  }
+  function setPat(v) {
+    try {
+      if (v) localStorage.setItem(PAT_KEY, v);
+      else localStorage.removeItem(PAT_KEY);
+    } catch (e) {}
+  }
+
+  function openSettings() {
+    var current = getPat();
+    patInputEl.value = current;
+    patStatusEl.textContent = current ? "保存済み" : "未設定";
+    patStatusEl.className = "ml-auto text-xs " + (current ? "text-green-500" : "text-gray-500");
+    settingsModalEl.classList.remove("hidden");
+  }
+  function closeSettings() {
+    settingsModalEl.classList.add("hidden");
+  }
+  settingsBtnEl.addEventListener("click", openSettings);
+  settingsCloseEl.addEventListener("click", closeSettings);
+  settingsModalEl.addEventListener("click", function (e) {
+    if (e.target === settingsModalEl) closeSettings();
+  });
+  patSaveEl.addEventListener("click", function () {
+    var v = patInputEl.value.trim();
+    setPat(v);
+    patStatusEl.textContent = v ? "保存しました" : "削除しました";
+    patStatusEl.className = "ml-auto text-xs " + (v ? "text-green-500" : "text-gray-500");
+  });
+  patClearEl.addEventListener("click", function () {
+    setPat("");
+    patInputEl.value = "";
+    patStatusEl.textContent = "削除しました";
+    patStatusEl.className = "ml-auto text-xs text-gray-500";
+  });
+
+  favExportEl.addEventListener("click", function () {
+    var json = JSON.stringify(getFavoritesArray(), null, 2);
+    var blob = new Blob([json], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "favorites-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  favClearAllEl.addEventListener("click", function () {
+    if (!confirm("お気に入りをすべて削除しますか？")) return;
+    saveFavorites({});
+    updateFavCount();
+    if (currentPeriod === "favorites") render();
+  });
+
+  // --- Refresh trigger (GitHub Actions workflow_dispatch) ---
+  function showToast(msg, detail, busy) {
+    refreshMessageEl.textContent = msg;
+    refreshDetailEl.innerHTML = detail || "";
+    refreshSpinnerEl.style.display = busy ? "" : "none";
+    refreshToastEl.classList.remove("hidden");
+  }
+  function hideToast() { refreshToastEl.classList.add("hidden"); }
+  refreshToastCloseEl.addEventListener("click", hideToast);
+
+  function ghHeaders(pat) {
+    return {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + pat,
+      "X-GitHub-Api-Version": "2022-11-28",
+    };
+  }
+
+  function dispatchWorkflow(pat) {
+    var url = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME +
+      "/actions/workflows/" + WORKFLOW_FILENAME + "/dispatches";
+    return fetch(url, {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders(pat)),
+      body: JSON.stringify({ ref: "main" }),
+    }).then(function (res) {
+      if (res.status === 204) return true;
+      return res.text().then(function (t) { throw new Error("GitHub API " + res.status + ": " + t); });
+    });
+  }
+
+  function findLatestRun(pat, sinceISO) {
+    var url = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME +
+      "/actions/workflows/" + WORKFLOW_FILENAME + "/runs?event=workflow_dispatch&per_page=5";
+    return fetch(url, { headers: ghHeaders(pat) }).then(function (res) {
+      if (!res.ok) throw new Error("GitHub runs API " + res.status);
+      return res.json();
+    }).then(function (data) {
+      var runs = data.workflow_runs || [];
+      for (var i = 0; i < runs.length; i++) {
+        if (new Date(runs[i].created_at).getTime() >= sinceISO) return runs[i];
+      }
+      return null;
+    });
+  }
+
+  function pollRun(pat, runId) {
+    var url = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME + "/actions/runs/" + runId;
+    return fetch(url, { headers: ghHeaders(pat) }).then(function (res) {
+      if (!res.ok) throw new Error("GitHub run API " + res.status);
+      return res.json();
+    });
+  }
+
+  function startRefresh() {
+    var pat = getPat();
+    if (!pat) {
+      openSettings();
+      patStatusEl.textContent = "PAT が未設定です";
+      patStatusEl.className = "ml-auto text-xs text-red-500";
+      return;
+    }
+
+    refreshBtnEl.disabled = true;
+    refreshBtnEl.classList.add("opacity-50", "pointer-events-none");
+    var startTs = Date.now() - 5000; // 5 sec backoff to catch the dispatch
+    showToast("ワークフローを起動中...", "", true);
+
+    dispatchWorkflow(pat).then(function () {
+      showToast("データ取得を開始しました", "GitHub Actions が実行中です。完了まで通常 4〜6 分かかります。", true);
+
+      // Wait for the new run to appear, then poll until completion
+      var runId = null;
+      var findAttempts = 0;
+      var lookForRun = function () {
+        return findLatestRun(pat, startTs).then(function (run) {
+          if (run) { runId = run.id; return run; }
+          findAttempts++;
+          if (findAttempts > 12) throw new Error("実行が見つかりません");
+          return new Promise(function (r) { setTimeout(r, 5000); }).then(lookForRun);
+        });
+      };
+
+      return lookForRun().then(function (run) {
+        var runUrl = run.html_url;
+        showToast("実行中...", '<a href="' + runUrl + '" target="_blank" rel="noopener" class="text-xblue underline">GitHub で確認 ↗</a>', true);
+
+        var poll = function () {
+          return new Promise(function (r) { setTimeout(r, 20000); })
+            .then(function () { return pollRun(pat, runId); })
+            .then(function (r) {
+              if (r.status === "completed") return r;
+              showToast("実行中...", '<a href="' + runUrl + '" target="_blank" rel="noopener" class="text-xblue underline">GitHub で確認 ↗</a><br>経過: ' + Math.round((Date.now() - startTs) / 1000) + "秒", true);
+              return poll();
+            });
+        };
+        return poll();
+      });
+    }).then(function (run) {
+      if (run.conclusion === "success") {
+        showToast("完了しました。データを再読込します...", "Pages の反映に追加で30秒程度かかる場合があります。", true);
+        // Wait a bit for Pages rebuild, then reload data
+        setTimeout(reloadData, 45000);
+      } else {
+        showToast("失敗しました: " + run.conclusion, '<a href="' + run.html_url + '" target="_blank" rel="noopener" class="text-xblue underline">GitHub で詳細を確認 ↗</a>', false);
+        refreshBtnEl.disabled = false;
+        refreshBtnEl.classList.remove("opacity-50", "pointer-events-none");
+      }
+    }).catch(function (err) {
+      console.error(err);
+      showToast("エラー", err.message, false);
+      refreshBtnEl.disabled = false;
+      refreshBtnEl.classList.remove("opacity-50", "pointer-events-none");
+    });
+  }
+  refreshBtnEl.addEventListener("click", startRefresh);
+
+  function reloadData() {
+    fetch("data.json?_=" + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        data = json;
+        var generatedAt = json.generated_at || json.fetched_at;
+        lastUpdatedEl.textContent = "Last updated: " + toJSTString(generatedAt);
+        render();
+        showToast("更新完了", "最新データを表示しています。", false);
+        setTimeout(hideToast, 4000);
+        refreshBtnEl.disabled = false;
+        refreshBtnEl.classList.remove("opacity-50", "pointer-events-none");
+      })
+      .catch(function (err) {
+        showToast("再読込に失敗", err.message + "（手動でリロードしてください）", false);
+        refreshBtnEl.disabled = false;
+        refreshBtnEl.classList.remove("opacity-50", "pointer-events-none");
+      });
+  }
+
+  // Esc closes any open modal
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!settingsModalEl.classList.contains("hidden")) closeSettings();
+  });
+
   // --- Show/hide states ---
 
   function showLoading() {
@@ -398,6 +709,7 @@
 
   function init() {
     showLoading();
+    updateFavCount();
 
     fetch("data.json")
       .then(function (res) {
