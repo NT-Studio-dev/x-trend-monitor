@@ -1,8 +1,8 @@
 {
   "period": "2026-W19",
   "type": "weekly",
-  "generated_at": "2026-05-09T10:22:44.713Z",
-  "daily_files_found": 3,
+  "generated_at": "2026-05-09T10:28:13.321Z",
+  "daily_files_found": 1,
   "stats": {
     "unique_tweets": 173
   },

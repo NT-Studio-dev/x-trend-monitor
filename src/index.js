@@ -28,8 +28,20 @@ async function main() {
   console.log(`[index] Fetching tweets for ${dateStr}...`);
   const dailyData = await fetchDaily(dateStr);
 
-  // 2. Save daily file
+  // Safety: refuse to overwrite existing data with an empty result.
+  // This protects against API outages / credit exhaustion wiping the dashboard.
   const dailyPath = path.join(DATA_DIR, "daily", `${dateStr}.json`);
+  if (dailyData.stats.unique_tweets === 0) {
+    console.error(
+      `[index] Fetched 0 tweets for ${dateStr}. Skipping save/rollup/render to preserve existing data.`,
+    );
+    if (fs.existsSync(dailyPath)) {
+      console.error(`[index] Keeping previous ${dailyPath} intact.`);
+    }
+    process.exit(1);
+  }
+
+  // 2. Save daily file
   fs.writeFileSync(dailyPath, JSON.stringify(dailyData, null, 2));
   console.log(`[index] Saved ${dailyPath} (${dailyData.stats.unique_tweets} tweets)`);
 
