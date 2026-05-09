@@ -1,7 +1,7 @@
 {
   "date": "2026-05-08",
   "timezone": "Asia/Tokyo",
-  "fetched_at": "2026-05-08T19:30:01.831Z",
+  "fetched_at": "2026-05-09T10:22:44.709Z",
   "query": {
     "text": "lang:ja filter:videos min_faves:5000 -filter:replies",
     "type": "Latest"
